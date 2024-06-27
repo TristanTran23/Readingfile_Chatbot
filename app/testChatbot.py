@@ -1,12 +1,13 @@
-import gradio as gr
+import os
+import openai
+import sys
+import langchain
 
-def read():
-    return 'sth'
+from langchain.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter, CharacterTextSplitter
 
-demo = gr.ChatInterface(
-    fn=read,
-    input=[],
-    output=["text"]
-)
 
-demo.launch()
+loader = PyPDFLoader("./assets/sql-for-data-analysis-advanced-techniques-for-transforming-data-into-insights.pdf")
+pages = loader.load()
+
+chap1 = pages[11:32]
