@@ -16,9 +16,10 @@ from langchain.retrievers.multi_query import MultiQueryRetriever
 local_path = "./assets/sql-for-data-analysis-advanced-techniques-for-transforming-data-into-insights.pdf"
 loader = PyPDFLoader(file_path=local_path)
 data = loader.load()
+first_chapter = data[11:32]
 
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=1, chunk_overlap=0,separators=["\n", "\n\n"])
-text_chunks = text_splitter.split_documents(data)
+text_splitter = RecursiveCharacterTextSplitter(chunk_overlap=0,separators=["\n", "\n\n"])
+text_chunks = text_splitter.split_documents(first_chapter)
 
 vector_store = Chroma.from_documents(
     documents=text_chunks,
@@ -60,4 +61,4 @@ chain = (
 )
 
 
-chain.invoke(input(""))
+print(chain.invoke(input("")))
