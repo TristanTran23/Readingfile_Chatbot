@@ -1,8 +1,10 @@
 chromadb
+gradio
 ollama
-streamlit 
+streamlit
 pypdf
 langchain
-langchain-core
+langchain_core
 langchain-community
+langchain_community
 langchain_text_splitters
