@@ -12,6 +12,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_community.chat_models import ChatOllama
 from langchain_core.runnables import RunnablePassthrough
 from langchain.retrievers.multi_query import MultiQueryRetriever
+import gradio as gr
 
 # Path to the local PDF file to be loaded
 local_path = "./assets/sql-for-data-analysis-advanced-techniques-for-transforming-data-into-insights.pdf"
@@ -20,6 +21,7 @@ local_path = "./assets/sql-for-data-analysis-advanced-techniques-for-transformin
 loader = PyPDFLoader(file_path=local_path)
 data = loader.load()  # Load the entire PDF document into memory
 first_chapter = data[11:32]  # Extract a subset of pages (from 12th to 32nd page)
+print(len(data))
 
 # Split the extracted document into smaller text chunks
 text_splitter = RecursiveCharacterTextSplitter(chunk_overlap=0, separators=["\n", "\n\n"])
@@ -34,7 +36,7 @@ vector_store = Chroma.from_documents(
 
 # Initialize a ChatOllama language model
 local_model = "llama3"
-llm = ChatOllama(model=local_model)
+llm = ChatOllama(model=local_model, temperature = 0)
 
 # Define a prompt template for generating alternative versions of user queries
 QUERY_PROMPT = PromptTemplate(
@@ -71,9 +73,10 @@ chain = (
     | StrOutputParser()  # Parse the output into a string format
 )
 
-# Interactive loop to continuously process user input until "quit" is entered
-while True:
-    inputt = input("Question: ")
-    if inputt == "quit":
-        break
-    print(chain.invoke(inputt))  # Invoke the chain with user input and print the result
+# Interactive loop to continuously process user input
+    
+def give_ans(question):
+    return chain.invoke(question)
+
+demo = gr.Interface(fn=give_ans, inputs="text", outputs="text")
+demo.launch()
