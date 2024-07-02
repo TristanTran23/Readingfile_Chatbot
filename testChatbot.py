@@ -18,11 +18,11 @@ loader = PyPDFLoader(file_path=local_path)
 data = loader.load()
 
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1, chunk_overlap=0,separators=["\n", "\n\n"])
-text_chunks = text_splitter.split(data)
+text_chunks = text_splitter.split_documents(data)
 
 vector_store = Chroma.from_documents(
     documents=text_chunks,
-    embeddings=OllamaEmbeddings(model="nomic-embed-text",show_progress=True),
+    embedding=OllamaEmbeddings(model="nomic-embed-text",show_progress=True),
     collection_name="local-rag"
 )
 
