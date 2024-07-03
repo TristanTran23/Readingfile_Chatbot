@@ -1,10 +1,10 @@
+# Import necessary modules and classes from LangChain library
 import gradio as gr
 from langchain_community.llms import Ollama
 from langchain_community.vectorstores import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.document_loaders import OnlinePDFLoader
+from langchain_community.document_loaders import PyPDFLoader, OnlinePDFLoader
 from langchain_community.embeddings import OllamaEmbeddings
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
@@ -13,69 +13,69 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_community.chat_models import ChatOllama
 from langchain_core.runnables import RunnablePassthrough
 from langchain.retrievers.multi_query import MultiQueryRetriever
-def readFile(question):
-    local_path = "./assets/sql-for-data-analysis-advanced-techniques-for-transforming-data-into-insights.pdf"
-    loader = PyPDFLoader(file_path=local_path)
-    data = loader.load()
-    chap1 = data[11:32]
 
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_overlap=0,
-        separators=["\n", "\n\n"]
-    )
-    text_chunks = text_splitter.split_documents(chap1)
+# Path to the local PDF file to be loaded
+local_path = "./assets/sql-for-data-analysis-advanced-techniques-for-transforming-data-into-insights.pdf"
 
-    # embeddings=OllamaEmbeddings(model="nomic-embed-text",show_progress=True),
-    vector_store = Chroma.from_documents(
-        documents=text_chunks, 
-        embedding=OllamaEmbeddings(model="nomic-embed-text",show_progress=True),
-        collection_name="local-rag",
-        persist_directory="./chroma_db"
-    )
-    vector_store.persist()
+# Load the PDF file using PyPDFLoader
+loader = PyPDFLoader(file_path=local_path)
+data = loader.load()  # Load the entire PDF document into memory
+first_chapter = data[11:32]  # Extract a subset of pages (from 12th to 32nd page)
 
-    # embedding_file = open("embeding.txt", "w")
-    # for list1 in embeddings:
-    #     for i in list1:
-    #         print(i, file = embedding_file)
-            
-    # embedding_file.close()
+# Split the extracted document into smaller text chunks
+text_splitter = RecursiveCharacterTextSplitter(chunk_overlap=0, separators=["\n", "\n\n"])
+text_chunks = text_splitter.split_documents(first_chapter)
 
-    local_model = "llama3"
-    llm = ChatOllama(model=local_model)
+# Create a vector store (Chroma) from the text chunks using Ollama embeddings
+vector_store = Chroma.from_documents(
+    documents=text_chunks,
+    embedding=OllamaEmbeddings(model="nomic-embed-text", show_progress=True),
+    collection_name="local-rag"
+)
 
-    QUERY_PROMPT = PromptTemplate(
-        input_variables=["query"],
-        template="""You are an AI language model assistant. Your task is to generate five
-        different versions of the given user question to retrieve relevant documents from
-        a vector database. By generating multiple perspectives on the user question, your
-        goal is to help the user overcome some of the limitations of the distance-based
-        similarity search. Provide these alternative questions separated by newlines.
-        Original question: {question}""",
-    )
+# Initialize a ChatOllama language model
+local_model = "llama3"
+llm = ChatOllama(model=local_model, temperature = 0)
 
-    retriever = MultiQueryRetriever.from_llm(
-        vector_store.as_retriever(), 
-        llm,
-        prompt=QUERY_PROMPT,
-    )
+# Define a prompt template for generating alternative versions of user queries
+QUERY_PROMPT = PromptTemplate(
+    input_variables=["query"],
+    template="""You are an AI language model assistant. You must not make any assumptions. Your task is to generate five
+    different versions of the given user question to retrieve relevant documents from
+    a vector database. By generating multiple perspectives on the user question, your
+    goal is to help the user overcome some of the limitations of the distance-based
+    similarity search. Provide these alternative questions separated by newlines.
+    Original question: {question}""",
+)
 
-    template = """Answer the question based ONLY on the following context:
-    {context}
-    Question: {question}
-    """
+# Create a multi-query retriever from the vector store and ChatOllama model with the defined prompt
+retriever = MultiQueryRetriever.from_llm(
+    vector_store.as_retriever(),
+    llm,
+    prompt=QUERY_PROMPT,
+)
 
-    prompt = ChatPromptTemplate.from_template(template)
+# Define a template for the prompt response
+template = """Answer the question based ONLY on the following context:
+{context}
+Question: {question}
+"""
 
-    chain = (
-        {"context": retriever, "question": RunnablePassthrough()}
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
+# Initialize a ChatPromptTemplate from the defined template
+prompt = ChatPromptTemplate.from_template(template)
 
+# Define a chain of operations to process user input
+chain = (
+    {"context": retriever, "question": RunnablePassthrough()}  # Inputs: context from retriever, question directly from user
+    | prompt  # Pass through the prompt template
+    | llm  # Process with the ChatOllama model
+    | StrOutputParser()  # Parse the output into a string format
+)
 
-    return(chain.invoke(question))
-    
-demo = gr.Interface(fn=readFile, inputs="text", outputs="text")
+# Interactive loop to continuously process user input
+
+def give_ans(question):
+    return chain.invoke(question)
+
+demo = gr.Interface(fn=give_ans, inputs="text", outputs="text")
 demo.launch()
