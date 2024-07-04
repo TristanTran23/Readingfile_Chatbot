@@ -1,5 +1,7 @@
 # Import necessary modules and classes from LangChain library
 import gradio as gr
+import aspose.words as aw
+import os.path
 from langchain_community.llms import Ollama
 from langchain_community.vectorstores import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -72,10 +74,31 @@ chain = (
     | StrOutputParser()  # Parse the output into a string format
 )
 
+num_of_download = 1
+
+def downloadFileDocx(result, num_of_download):
+    doc = aw.Document()
+    builder = aw.DocumentBuilder(doc)
+    builder.writeln(result)
+    filename = "output"
+    if (os.path.isfile("./{filename}.docx")):
+        print(filename)
+        
+        if (num_of_download == 1):
+            filename += "1"
+        else:
+            filename = filename[:-1]
+            filename += str(num_of_download) 
+        print("./{filename}.docx")
+        num_of_download += 1        
+    doc.save("{filename}.docx")
+
 # Interactive loop to continuously process user input
 
 def give_ans(question):
-    return chain.invoke(question)
+    result = chain.invoke(question)
+    downloadFileDocx(result, num_of_download)
+    return result
 
 demo = gr.Interface(fn=give_ans, inputs="text", outputs="text")
 demo.launch(share=True)
