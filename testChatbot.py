@@ -7,31 +7,15 @@ from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 from langchain_community.document_loaders import PyPDFLoader, OnlinePDFLoader
 from langchain_community.embeddings import OllamaEmbeddings
 from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.chains import create_retrieval_chain
+from langchain.chains import RetrievalQA, SimpleSequentialChain
 from langchain.prompts import PromptTemplate, ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.chat_models import ChatOllama
 from langchain_core.runnables import RunnablePassthrough
-from langchain.retrievers.multi_query import MultiQueryRetriever
+from langchain.retrievers import ContextualCompressionRetriever, MultiQueryRetriever
+from langchain.retrievers.document_compressors import LLMChainExtractor
 
-# Path to the local PDF file to be loaded
-local_path = "./assets/sql-for-data-analysis-advanced-techniques-for-transforming-data-into-insights.pdf"
-
-# Load the PDF file using PyPDFLoader
-loader = PyPDFLoader(file_path=local_path)
-data = loader.load()  # Load the entire PDF document into memory
-first_chapter = data[11:32]  # Extract a subset of pages (from 12th to 32nd page)
-
-# Split the extracted document into smaller text chunks
-text_splitter = RecursiveCharacterTextSplitter(chunk_overlap=0, separators=["\n", "\n\n"])
-text_chunks = text_splitter.split_documents(first_chapter)
-
-# Create a vector store (Chroma) from the text chunks using Ollama embeddings
-vector_store = Chroma.from_documents(
-    documents=text_chunks,
-    embedding=OllamaEmbeddings(model="nomic-embed-text", show_progress=True),
-    collection_name="local-rag"
-)
+vector_store = Chroma(persist_directory=".//chroma_db")
 
 # Initialize a ChatOllama language model
 local_model = "llama3"
@@ -40,12 +24,18 @@ llm = ChatOllama(model=local_model, temperature = 0)
 # Define a prompt template for generating alternative versions of user queries
 QUERY_PROMPT = PromptTemplate(
     input_variables=["query"],
-    template="""You are an AI language model assistant. You must not make any assumptions. Your task is to generate five
-    different versions of the given user question to retrieve relevant documents from
-    a vector database. By generating multiple perspectives on the user question, your
-    goal is to help the user overcome some of the limitations of the distance-based
-    similarity search. Provide these alternative questions separated by newlines.
-    Original question: {question}""",
+    template="""you are an AI teacher assistant. you must not make any assumptions. you must use the information given by my pdf files. 
+        you are required to find at least 3 paragraphs related to the user's question in this textbook. each paragraph must directly answer the question or give helpful information.
+        provide the answer in seperated paragraphs. Provide these alternative questions separated by newlines.
+        Original question: {question}""",
+)
+
+#Compress the document using the LLMChainExtractor
+compressor = LLMChainExtractor.from_llm(llm)
+compression_retriever = ContextualCompressionRetriever(
+    base_compressor=compressor,
+    base_retriever=vector_store.as_retriever(),
+    prompt=QUERY_PROMPT,
 )
 
 # Create a multi-query retriever from the vector store and ChatOllama model with the defined prompt
@@ -64,6 +54,8 @@ Question: {question}
 # Initialize a ChatPromptTemplate from the defined template
 prompt = ChatPromptTemplate.from_template(template)
 
+dataFiltered = vector_store.similarity_search()
+
 # Define a chain of operations to process user input
 chain = (
     {"context": retriever, "question": RunnablePassthrough()}  # Inputs: context from retriever, question directly from user
@@ -78,4 +70,4 @@ def give_ans(question):
     return chain.invoke(question)
 
 demo = gr.Interface(fn=give_ans, inputs="text", outputs="text")
-demo.launch()
+demo.launch(share=True)
