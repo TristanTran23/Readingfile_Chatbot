@@ -14,8 +14,12 @@ from langchain_community.chat_models import ChatOllama
 from langchain_core.runnables import RunnablePassthrough
 from langchain.retrievers import ContextualCompressionRetriever, MultiQueryRetriever
 from langchain.retrievers.document_compressors import LLMChainExtractor
+from langchain.chains import RetrievalQA
 
-vector_store = Chroma(persist_directory=".//chroma_db")
+vector_store = Chroma(
+    persist_directory=".//chroma_db",
+    embedding_function = OllamaEmbeddings(model="nomic-embed-text")
+)
 
 # Initialize a ChatOllama language model
 local_model = "llama3"
@@ -38,6 +42,7 @@ compression_retriever = ContextualCompressionRetriever(
     prompt=QUERY_PROMPT,
 )
 
+
 # Create a multi-query retriever from the vector store and ChatOllama model with the defined prompt
 retriever = MultiQueryRetriever.from_llm(
     vector_store.as_retriever(),
@@ -54,11 +59,14 @@ Question: {question}
 # Initialize a ChatPromptTemplate from the defined template
 prompt = ChatPromptTemplate.from_template(template)
 
-dataFiltered = vector_store.similarity_search()
+qa_chain = RetrievalQA.from_chain_type(
+    llm,
+    retriever=compression_retriever
+)
 
 # Define a chain of operations to process user input
 chain = (
-    {"context": retriever, "question": RunnablePassthrough()}  # Inputs: context from retriever, question directly from user
+    {"context": compression_retriever, "question": RunnablePassthrough()}  # Inputs: context from retriever, question directly from user
     | prompt  # Pass through the prompt template
     | llm  # Process with the ChatOllama model
     | StrOutputParser()  # Parse the output into a string format
