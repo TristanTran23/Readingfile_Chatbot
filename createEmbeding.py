@@ -20,7 +20,7 @@ text_chunks = text_splitter.split_documents(first_chapter)
 vector_store = Chroma.from_documents(
     documents=text_chunks,
     embedding=OllamaEmbeddings(model="nomic-embed-text", show_progress=True),
-    collection_name="local-rag",
+    collection_name="chapter_1",
     persist_directory = './chroma',
 )
 vector_store.persist()  # Persist the vector store to disk
